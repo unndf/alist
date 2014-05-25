@@ -3,68 +3,58 @@
 package require sqlite3
 package require Tk
 
-namespace eval db_handler {
-    if {[catch {sqlite3 list_db list.db -create 0} ]} {
-        sqlite3 list_db list.db -create 1
-        list_db eval {CREATE TABLE anime( anime_title text,
-                                   no_eps int,
-                                   no_eps_watched int,
-                                   descr text,
+
+namespace eval alist_gui {
+#-----Connect to database---------
+    if {[catch {sqlite3 alist_db list.db -create 0} ]} {
+        sqlite3 alist_db list.db -create 1
+        alist_db eval {CREATE TABLE anime(title text,
+                                   japanese text,
+                                   total_episodes int,
+                                   total_watched int,
+                                   type text,
+                                   description text,
                                    rating text,
                                    status text,
                                    notes text
                                    )}
-    }
-    proc remove_anime {id} {
-        list_db eval {DELETE FROM anime WHERE rowid == id}
-    }
-    proc cleanup {} {
-        list_db close
-    }
-    proc search_db {phrase} {
-        return [list_db eval {SELECT anime_title FROM anime WHERE anime_title LIKE "%$phrase%"}]
-    }
-    proc get_completed {} {
-        return [list_db eval {SELECT * FROM anime WHERE no_eps_watched == no_eps}]
-    }
-    proc get_backlog {} {
-        return [list_db eval {SELECT * FROM anime WHERE no_eps_watched == 0}]
-    }
-    proc get_anime_list {} {
-        return [list_db eval {SELECT * FROM anime}]
-    }
-    proc add_title {title no_eps no_eps_watched descr rating status notes} {
-        list_db eval {INSERT INTO anime (anime_title, no_eps, no_eps_watched, descr, rating, status, notes)
-                             VALUES($title, $no_eps, $no_eps_watched, $desr, $rating, $status, $notes)
-                     }
-    }
-}
-#TODO: Actually make the gui look good
-namespace eval alist_gui {
-    namespace eval event_handlers {
-        proc add_dialog {title noeps descr status notes} {
-           ::db_handler::add_title $title $noeps 0 $descr 0 $status $notes
-        }
+
     }
     proc add_dialog {} { 
         #ensure that only a single add_window is open at a time
         if [expr ![catch {toplevel .add_window } ] ] {
+            variable ::title
+            variable ::no_eps
+            variable ::descr
+            variable ::status
+
             wm title .add_window "Add Title to Database"
             ttk::label .add_window.titlelab -text "Title"
-            ttk::entry .add_window.titleen
+            ttk::entry .add_window.titleen -textvariable title
             ttk::label .add_window.no_epslab -text "No. Episodes"
-            ttk::entry .add_window.no_epsen
-            ttk::label .add_window.descrlab -text "Description" -textvariable descr
-            text .add_window.descrbox
+            ttk::entry .add_window.no_epsen -textvariable no_eps
+            ttk::label .add_window.descrlab -text "Description" 
+            text .add_window.descrbox 
             ttk::label .add_window.statuslab -text "Status" 
-            listbox .add_window.statusbox 
-            .add_window.statusbox insert 0 Watching Backlogged "Plan to Watch"
-
+            ttk::combobox .add_window.statusbox -state readonly -textvariable status -values [list "Watching" "On Hold" "Plan to Watch" "Dropped" "Completed"]
+            .add_window.statusbox current 0
             ttk::label .add_window.noteslab -text "Description"
-            text .add_window.notesbox 
+            tk::text .add_window.notesbox -width 10 -height 10
 
-            ttk::button .add_window.submit -text "Submit" 
-            
+            ttk::button .add_window.submit -text "Submit" -command {
+                set watched 0
+                if { [string equal $status "Completed"] } {
+                    set watched $no_eps
+                }
+                alist_db eval {INSERT INTO anime (title, japanese, total_episodes, total_watched, type, description, rating, status, notes)
+                             VALUES($title,"",$no_eps, $watched,"" ,$desr, 0, $status, "")
+                }
+                set last [alist_db last_insert_rowid]
+                alist_db eval {SELECT rowid, * FROM anime WHERE rowid == $last} {
+                    .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status]
+                }
+                destroy .add_window
+            }
             grid .add_window.submit -row 4 -column 0
             grid .add_window.titlelab -row 0 -column 0
             grid .add_window.titleen -row 0 -column 1
@@ -77,44 +67,27 @@ namespace eval alist_gui {
         }
     }
     proc populate_list {} {
-        #populates the treeview "list" in the GUI
-        #test
-        #.tabs.collection.rightpane.list insert {} end -id serie  -values {asas asas asasa asa asas}
-        #.tabs.collection.rightpane.list insert {} end -id series -text "asasa"
+        alist_db eval {SELECT rowid, * FROM anime} {
+            .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status]
+        }
     }
     proc start {} { 
 #--------Create GUI components---------
     wm title . "alist"
+    
+    ttk::button .addbutton -text "add" -command alist_gui::add_dialog
+    grid .addbutton -column 0 -row 0
+    ttk::treeview .mylist -columns "series no_eps watched status" -show "headings"
+    .mylist heading series -text Series
+    .mylist heading no_eps -text Episodes
+    .mylist heading watched -text Watched
+    .mylist heading status -text Status
 
-    ttk::notebook .tabs
-    ttk::frame .tabs.collection
-    ttk::frame .tabs.list
-
-#--------Create Frames----------------
-    ttk::frame .tabs.collection.rightpane 
-    ttk::frame .tabs.collection.leftlist
-
-    .tabs add .tabs.collection -text "Collection"
-    .tabs add .tabs.list -text "List"
-
-#--------Fill frames with Widgets-----
-    ttk::button .tabs.collection.rightpane.addbutton -text "add" -command alist_gui::add_dialog
-    grid .tabs.collection.rightpane.addbutton -column 0 -row 0
-    ttk::treeview .tabs.collection.rightpane.list -columns "series no_eps watched status" -show "headings"
-    .tabs.collection.rightpane.list heading series -text Series
-    .tabs.collection.rightpane.list heading no_eps -text Episodes
-    .tabs.collection.rightpane.list heading watched -text Watched
-    .tabs.collection.rightpane.list heading status -text Status
-
-    grid .tabs.collection.rightpane.list -column 1 -row 0 -sticky nsew 
+    grid .mylist -column 1 -row 0 -sticky nsew 
     ::alist_gui::populate_list
 #--------Configure Grid---------------
-    grid columnconfigure . 0 -weight 1
-    grid .tabs -column 0 -row 0 -sticky nsew
-    grid .tabs.collection.rightpane -column 0 -row 0 -padx 10 -pady 10 -sticky nsew 
-    grid .tabs.collection.leftlist -column 1 -row 0 -padx 10 -pady 10
-
+    grid columnconfigure . 1 -weight 1
+    grid rowconfigure . 0 -weight 1
     }
 }
-
 alist_gui::start
