@@ -3,7 +3,6 @@
 package require sqlite3
 package require Tk
 
-
 namespace eval alist_gui {
 #-----Connect to database---------
     if {[catch {sqlite3 alist_db list.db -create 0} ]} {
@@ -27,12 +26,27 @@ namespace eval alist_gui {
             variable ::no_eps
             variable ::descr
             variable ::status
-
+            
+            bind .add_window <Destroy> {
+                if {"%W" == ".add_window"} {
+                    #find a way to unset these
+                    #unset $title
+                    #unset $no_eps
+                    #unset $desc
+                    #unset $status
+                }
+            }
             wm title .add_window "Add Title to Database"
             ttk::label .add_window.titlelab -text "Title"
             ttk::entry .add_window.titleen -textvariable title
             ttk::label .add_window.no_epslab -text "No. Episodes"
-            ttk::entry .add_window.no_epsen -textvariable no_eps
+            ttk::entry .add_window.no_epsen -textvariable no_eps -validate focusout -validatecommand {
+                return [string is integer -strict %P]
+            } -invalidcommand {
+                %W delete 0 [string length [%W get]]
+                %W insert 0 12
+                %W select range 0 2
+            }
             ttk::label .add_window.descrlab -text "Description" 
             text .add_window.descrbox 
             ttk::label .add_window.statuslab -text "Status" 
@@ -74,7 +88,7 @@ namespace eval alist_gui {
     proc start {} { 
 #--------Create GUI components---------
     wm title . "alist"
-    
+
     ttk::button .addbutton -text "add" -command alist_gui::add_dialog
     grid .addbutton -column 0 -row 0
     ttk::treeview .mylist -columns "series no_eps watched status" -show "headings"
