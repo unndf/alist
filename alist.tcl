@@ -20,7 +20,7 @@ namespace eval alist_gui {
                                    )}
 
     }
-    proc add_dialog {} { 
+    proc add_dialog {{rwid ""}} { 
         #TODO: Allow grabbing info from MAL and ANILIST
         #ensure that only a single add_window is open at a time
         if [expr ![catch {toplevel .add_window } ] ] {
@@ -31,7 +31,20 @@ namespace eval alist_gui {
             variable ::descr {}
             variable ::status {}
             variable ::rating {}
-
+            variable ::rowid {}
+            
+            set rowid $rwid
+            if { [expr {![string equal $rowid ""] } ] } {
+                alist_db eval {SELECT rowid, * FROM anime WHERE rowid == $rowid} vals {
+                    set title $vals(title)
+                    set japanese $vals(japanese)
+                    set no_eps $vals(total_episodes)
+                    set watched $vals(total_watched)
+                    set descr $vals(description)
+                    set status $vals(status)
+                    set rating $vals(rating)
+                }
+            }
             bind .add_window <Destroy> {
                 if {"%W" == ".add_window"} {
                     unset title
@@ -41,6 +54,7 @@ namespace eval alist_gui {
                     unset descr
                     unset status
                     unset rating
+                    unset rowid
                 }
             }
 
@@ -87,15 +101,26 @@ namespace eval alist_gui {
                 if { [string equal $status "Completed"] } {
                     set watched $no_eps
                 }
-                alist_db eval {INSERT INTO anime (title, japanese, total_episodes, total_watched, type, description, rating, status, notes)
-                             VALUES($title,$japanese,$no_eps, $watched,"" ,$desr, $rating, $status, "")
-                }
-                set last [alist_db last_insert_rowid]
-                alist_db eval {SELECT rowid, * FROM anime WHERE rowid == $last} {
-                    .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
+                if {[expr {![string equal $rowid ""]} ]} {
+                     alist_db eval {UPDATE anime SET title=$title, japanese=$japanese, total_episodes=$no_eps, total_watched=$watched, description=$desr, rating=$rating, status=$status 
+                     WHERE rowid = $rowid 
+                     }
+                     #.mylist tag configure $rowid -values  [list $title $no_eps $watched $status $rating]  
+                     .mylist set $rowid series $title
+                     .mylist set $rowid no_eps $no_eps
+                     .mylist set $rowid watched $watched
+                     .mylist set $rowid status $status
+                } else {
+                    alist_db eval {INSERT INTO anime (title, japanese, total_episodes, total_watched, type, description, rating, status, notes)
+                                 VALUES($title,$japanese,$no_eps, $watched,"" ,$desr, $rating, $status, "")
+                    }
+                    set last [alist_db last_insert_rowid]
+                    alist_db eval {SELECT rowid, * FROM anime WHERE rowid == $last} {
+                        .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
+                    }
                 }
                 .mylist tag bind $rowid <Double-1>  {
-                    ::alist_gui::more_info_dialog [%W focus]
+                    ::alist_gui::add_dialog [%W focus]
                 }
 
                 destroy .add_window
@@ -118,18 +143,11 @@ namespace eval alist_gui {
             grid .add_window.ratingbox -row 2 -column 3 -pady 2
         }
     }
-    proc more_info_dialog {rowid} {
-       #Display more info
-       #allow editing of entries
-       if [expr ![catch {toplevel .add_window } ] ] {
-        
-       }
-    }
     proc populate_list {} {
         alist_db eval {SELECT rowid, * FROM anime} {
             .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
             .mylist tag bind $rowid <Double-1>  {
-                ::alist_gui::more_info_dialog [%W focus]
+                ::alist_gui::add_dialog [%W focus]
             }
         }
     }
