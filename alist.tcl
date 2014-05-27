@@ -5,6 +5,7 @@ package require Tk
 
 namespace eval alist_gui {
 #-----Connect to database---------
+    #TODO: add user preference table
     if {[catch {sqlite3 alist_db list.db -create 0} ]} {
         sqlite3 alist_db list.db -create 1
         alist_db eval {CREATE TABLE anime(title text,
@@ -91,7 +92,7 @@ namespace eval alist_gui {
                 }
                 set last [alist_db last_insert_rowid]
                 alist_db eval {SELECT rowid, * FROM anime WHERE rowid == $last} {
-                    .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags $rowid $status $rating
+                    .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
                 }
                 .mylist tag bind $rowid <Double-1>  {
                     ::alist_gui::more_info_dialog [%W focus]
@@ -120,6 +121,9 @@ namespace eval alist_gui {
     proc more_info_dialog {rowid} {
        #Display more info
        #allow editing of entries
+       if [expr ![catch {toplevel .add_window } ] ] {
+        
+       }
     }
     proc populate_list {} {
         alist_db eval {SELECT rowid, * FROM anime} {
