@@ -2,6 +2,7 @@
 
 package require sqlite3
 package require Tk
+package require Tcl 8.6
 
 namespace eval alist_gui {
 #-----Connect to database---------
@@ -87,6 +88,7 @@ namespace eval alist_gui {
 
             ttk::label .add_window.descrlab -text "Description" 
             text .add_window.descrbox -width 40 -height 10
+            .add_window.descrbox insert 1.0 $descr
             ttk::label .add_window.statuslab -text "Status" 
             ttk::combobox .add_window.statusbox -state readonly -textvariable status -values [list "Watching" "On Hold" "Plan to Watch" "Dropped" "Completed"]
             .add_window.statusbox current 0
@@ -98,21 +100,21 @@ namespace eval alist_gui {
             tk::text .add_window.notesbox -width 10 -height 5
 
             ttk::button .add_window.submit -text "Submit" -command {
+                set descr [.add_window.descrbox get 1.0 end]
                 if { [string equal $status "Completed"] } {
                     set watched $no_eps
                 }
                 if {[expr {![string equal $rowid ""]} ]} {
-                     alist_db eval {UPDATE anime SET title=$title, japanese=$japanese, total_episodes=$no_eps, total_watched=$watched, description=$desr, rating=$rating, status=$status 
+                     alist_db eval {UPDATE anime SET title=$title, japanese=$japanese, total_episodes=$no_eps, total_watched=$watched, description=$descr, rating=$rating, status=$status 
                      WHERE rowid = $rowid 
                      }
-                     #.mylist tag configure $rowid -values  [list $title $no_eps $watched $status $rating]  
                      .mylist set $rowid series $title
                      .mylist set $rowid no_eps $no_eps
                      .mylist set $rowid watched $watched
                      .mylist set $rowid status $status
                 } else {
                     alist_db eval {INSERT INTO anime (title, japanese, total_episodes, total_watched, type, description, rating, status, notes)
-                                 VALUES($title,$japanese,$no_eps, $watched,"" ,$desr, $rating, $status, "")
+                                 VALUES($title,$japanese,$no_eps, $watched,"" ,$descr, $rating, $status, "")
                     }
                     set last [alist_db last_insert_rowid]
                     alist_db eval {SELECT rowid, * FROM anime WHERE rowid == $last} {
@@ -153,25 +155,25 @@ namespace eval alist_gui {
     }
     proc start {} { 
 #--------Create GUI components---------
-    wm title . "alist"
-    ttk::button .addbutton -text "add" -command alist_gui::add_dialog
-    grid .addbutton -column 0 -row 0
-    ttk::treeview .mylist -columns "series no_eps watched status rating" -show "headings"
-    .mylist heading series -text Series
-    .mylist heading no_eps -text Episodes
-    .mylist heading watched -text Watched
-    .mylist heading status -text Status
+        wm title . "alist"
+        ttk::button .addbutton -text "add" -command alist_gui::add_dialog
+        grid .addbutton -column 0 -row 0
+        ttk::treeview .mylist -columns "series no_eps watched status rating" -show "headings"
+        .mylist heading series -text Series
+        .mylist heading no_eps -text Episodes
+        .mylist heading watched -text Watched
+        .mylist heading status -text Status
 
-    grid .mylist -column 1 -row 0 -sticky nsew 
-    ::alist_gui::populate_list
+        grid .mylist -column 1 -row 0 -sticky nsew 
+        ::alist_gui::populate_list
 #--------Configure Grid---------------
-    grid columnconfigure . 1 -weight 1
-    grid rowconfigure . 0 -weight 1
+        grid columnconfigure . 1 -weight 1
+        grid rowconfigure . 0 -weight 1
 
 #--------Cleanup---------------------
-    bind . <Destroy> {
-        alist_db close        
-    }
+        bind . <Destroy> {
+            alist_db close        
+        }
 
     }
 }
