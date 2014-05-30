@@ -44,8 +44,12 @@ namespace eval alist_gui {
                     set descr $vals(description)
                     set status $vals(status)
                     set rating $vals(rating)
+                    wm title .add_window "Edit Title"
                 }
+            } else {
+                wm title .add_window "Add Title to Database"
             }
+
             bind .add_window <Destroy> {
                 if {"%W" == ".add_window"} {
                     unset title
@@ -59,7 +63,6 @@ namespace eval alist_gui {
                 }
             }
 
-            wm title .add_window "Add Title to Database"
             ttk::frame .add_window.leftframe
             ttk::label .add_window.leftframe.titlelab -text "Title"
             ttk::entry .add_window.leftframe.titleen -textvariable title
@@ -108,7 +111,7 @@ namespace eval alist_gui {
                      alist_db eval {UPDATE anime SET title=$title, japanese=$japanese, total_episodes=$no_eps, total_watched=$watched, description=$descr, rating=$rating, status=$status 
                      WHERE rowid = $rowid 
                      }
-                     .mylist set $rowid series $title
+                     .mylist set $rowid title $title
                      .mylist set $rowid no_eps $no_eps
                      .mylist set $rowid watched $watched
                      .mylist set $rowid status $status
@@ -156,15 +159,24 @@ namespace eval alist_gui {
     proc start {} { 
 #--------Create GUI components---------
         wm title . "alist"
-        ttk::button .addbutton -text "add" -command alist_gui::add_dialog
-        grid .addbutton -column 0 -row 0
-        ttk::treeview .mylist -columns "series no_eps watched status rating" -show "headings"
-        .mylist heading series -text Series
+        option add *tearOff 0 ;#disable menu tearoff
+
+        menu .menubar 
+        menu .menubar.file
+        menu .menubar.edit
+        .menubar add cascade -menu .menubar.file -label File
+        .menubar add cascade -menu .menubar.edit -label Edit
+        .menubar.edit add command -label Preferences
+        .menubar.edit add command -label "Add Title to DB" -command alist_gui::add_dialog 
+        . configure -menu .menubar
+        
+        ttk::treeview .mylist -columns "title no_eps watched status rating" -show "headings"
+        .mylist heading title -text Title
         .mylist heading no_eps -text Episodes
         .mylist heading watched -text Watched
         .mylist heading status -text Status
 
-        grid .mylist -column 1 -row 0 -sticky nsew 
+        grid .mylist -column 0 -row 0 -sticky nsew 
         ::alist_gui::populate_list
 #--------Configure Grid---------------
         grid columnconfigure . 1 -weight 1
