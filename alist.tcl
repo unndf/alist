@@ -63,6 +63,7 @@ namespace eval alist_gui {
                 }
             }
 
+            focus .add_window
             ttk::frame .add_window.leftframe
             ttk::label .add_window.leftframe.titlelab -text "Title"
             ttk::entry .add_window.leftframe.titleen -textvariable title
@@ -146,6 +147,38 @@ namespace eval alist_gui {
             grid .add_window.statusbox -row 1 -column 3 -pady 2
             grid .add_window.ratinglab -row 2 -column 2 -pady 2
             grid .add_window.ratingbox -row 2 -column 3 -pady 2
+        } else {
+            bell
+            focus .add_window
+        }
+    }
+    proc populate_search_window {} {
+        variable ::search_string
+        if {[winfo exists .search_window.list]} {
+            destroy .search_window.list 
+        }
+        ttk::treeview .search_window.list -columns "title no_eps watched status rating" -show "headings"
+        .search_window.list heading title -text Title
+        .search_window.list heading no_eps -text Episodes
+        .search_window.list heading watched -text Watched
+        .search_window.list heading status -text Status
+        .search_window.list heading rating -text Rating
+        grid .search_window.list -row 0 -column 0 -sticky nsew
+        
+        alist_db eval "SELECT rowid, * FROM anime WHERE title LIKE '%$search_string%' ORDER BY title"  { 
+           .search_window.list insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
+        }
+    }
+    proc search_window {} {
+        #ensures only a single window is open at a time
+        if [expr ![catch {toplevel .search_window } ] ] {
+            wm title .search_window Search
+            alist_gui::populate_search_window
+
+        } else {
+            bell 
+            focus .search_window
+            alist_gui::populate_search_window
         }
     }
     proc populate_list {} {
@@ -158,6 +191,7 @@ namespace eval alist_gui {
     }
     proc start {} { 
 #--------Create GUI components---------
+        variable ::search_string {}
         wm title . "alist"
         option add *tearOff 0 ;#disable menu tearoff
 
@@ -170,16 +204,29 @@ namespace eval alist_gui {
         .menubar.edit add command -label "Add Title to DB" -command alist_gui::add_dialog 
         . configure -menu .menubar
         
+
         ttk::treeview .mylist -columns "title no_eps watched status rating" -show "headings"
         .mylist heading title -text Title
         .mylist heading no_eps -text Episodes
         .mylist heading watched -text Watched
         .mylist heading status -text Status
-
-        grid .mylist -column 0 -row 0 -sticky nsew 
+        .mylist heading rating -text Rating
+ 
         ::alist_gui::populate_list
+        
+        ttk::entry .searchbox -textvariable search_string
+        ttk::button .searchbut -text "Search" -command {
+            if {[expr {![string equal $search_string ""]}]} {
+                alist_gui::search_window
+            }
+        }
+
+        grid .searchbut -column 1 -row 1 -sticky nse -padx 2 -pady 2
+        grid .searchbox -column 0 -row 1 -sticky nse -padx 10 -pady 1
+        grid .mylist -column 0 -row 0 -sticky nsew -columnspan 2
+        
 #--------Configure Grid---------------
-        grid columnconfigure . 1 -weight 1
+        grid columnconfigure . 0 -weight 1
         grid rowconfigure . 0 -weight 1
 
 #--------Cleanup---------------------
