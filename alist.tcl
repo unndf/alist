@@ -7,6 +7,7 @@ package require Tcl 8.6
 namespace eval alist_gui {
 #-----Connect to database---------
     #TODO: add user preference table
+    variable alist_db 
     if {[catch {sqlite3 alist_db list.db -create 0} ]} {
         sqlite3 alist_db list.db -create 1
         alist_db eval {CREATE TABLE anime(title text,
@@ -152,46 +153,37 @@ namespace eval alist_gui {
             focus .add_window
         }
     }
-    proc populate_search_window {} {
+    proc search_command {} {
         variable ::search_string
-        if {[winfo exists .search_window.list]} {
-            destroy .search_window.list 
-        }
-        ttk::treeview .search_window.list -columns "title no_eps watched status rating" -show "headings"
-        .search_window.list heading title -text Title
-        .search_window.list heading no_eps -text Episodes
-        .search_window.list heading watched -text Watched
-        .search_window.list heading status -text Status
-        .search_window.list heading rating -text Rating
-        grid .search_window.list -row 0 -column 0 -sticky nsew
-        
-        alist_db eval "SELECT rowid, * FROM anime WHERE title LIKE '%$search_string%' ORDER BY title"  { 
-           .search_window.list insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
-        }
-    }
-    proc search_window {} {
-        #ensures only a single window is open at a time
-        if [expr ![catch {toplevel .search_window } ] ] {
-            wm title .search_window Search
-            alist_gui::populate_search_window
+        variable ::mylist_items
+        .mylist delete $mylist_items
+        set mylist_items {}
 
-        } else {
-            bell 
-            focus .search_window
-            alist_gui::populate_search_window
-        }
-    }
-    proc populate_list {} {
-        alist_db eval {SELECT rowid, * FROM anime} {
-            .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
-            .mylist tag bind $rowid <Double-1>  {
-                ::alist_gui::add_dialog [%W focus]
+        if {[string equal $search_string "" ]} {
+            alist_db eval {SELECT rowid, * FROM anime} {
+                .mylist insert {} end -id $rowid -values  [list "$title ($japanese)" $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
+                lappend mylist_items $rowid
+                .mylist tag bind $rowid <Double-1>  {
+                    ::alist_gui::add_dialog [%W focus]
+                }
+            }
+        } else { 
+            alist_db eval "SELECT rowid, * FROM anime WHERE title LIKE '%$search_string%' ORDER BY title"  { 
+                .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
+                
+                lappend mylist_items $rowid
+                .mylist tag bind $rowid <Double-1>  {
+                    #::alist_gui::add_dialog [%W focus]
+                }
             }
         }
+        update idletasks
     }
+
     proc start {} { 
 #--------Create GUI components---------
         variable ::search_string {}
+        variable ::mylist_items {}
         wm title . "alist"
         option add *tearOff 0 ;#disable menu tearoff
 
@@ -203,7 +195,17 @@ namespace eval alist_gui {
         .menubar.edit add command -label Preferences
         .menubar.edit add command -label "Add Title to DB" -command alist_gui::add_dialog 
         . configure -menu .menubar
+ 
+        ttk::entry .searchbox -textvariable search_string
         
+        ttk::button .searchbut -text "Search" -command {
+            if {[expr {![string equal $search_string ""]}]} {
+                alist_gui::search_command
+            }
+        }
+        bind .searchbox <KeyRelease> {
+            alist_gui::search_command
+        }
 
         ttk::treeview .mylist -columns "title no_eps watched status rating" -show "headings"
         .mylist heading title -text Title
@@ -211,16 +213,8 @@ namespace eval alist_gui {
         .mylist heading watched -text Watched
         .mylist heading status -text Status
         .mylist heading rating -text Rating
- 
-        ::alist_gui::populate_list
-        
-        ttk::entry .searchbox -textvariable search_string
-        ttk::button .searchbut -text "Search" -command {
-            if {[expr {![string equal $search_string ""]}]} {
-                alist_gui::search_window
-            }
-        }
 
+        alist_gui::search_command
         grid .searchbut -column 1 -row 1 -sticky nse -padx 2 -pady 2
         grid .searchbox -column 0 -row 1 -sticky nse -padx 10 -pady 1
         grid .mylist -column 0 -row 0 -sticky nsew -columnspan 2
