@@ -160,8 +160,8 @@ namespace eval alist_gui {
         set mylist_items {}
 
         if {[string equal $search_string "" ]} {
-            alist_db eval {SELECT rowid, * FROM anime} {
-                .mylist insert {} end -id $rowid -values  [list "$title ($japanese)" $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
+            alist_db eval {SELECT rowid, * FROM anime ORDER BY title} {
+                .mylist insert {} end -id $rowid -values  [list $title $total_episodes $total_watched $status $rating] -tags "$rowid $status $rating"
                 lappend mylist_items $rowid
                 .mylist tag bind $rowid <Double-1>  {
                     ::alist_gui::add_dialog [%W focus]
@@ -173,7 +173,7 @@ namespace eval alist_gui {
                 
                 lappend mylist_items $rowid
                 .mylist tag bind $rowid <Double-1>  {
-                    #::alist_gui::add_dialog [%W focus]
+                    ::alist_gui::add_dialog [%W focus]
                 }
             }
         }
@@ -210,16 +210,21 @@ namespace eval alist_gui {
         ttk::treeview .mylist -columns "title no_eps watched status rating" -show "headings"
         .mylist heading title -text Title
         .mylist heading no_eps -text Episodes
+        .mylist column no_eps -width 80
         .mylist heading watched -text Watched
+        .mylist column watched -width 80
         .mylist heading status -text Status
+        .mylist column status -width 160
         .mylist heading rating -text Rating
-
+        .mylist column rating -width 160
+        
+        #call the search command to populate the treeview
         alist_gui::search_command
+
+#--------Configure Grid---------------
         grid .searchbut -column 1 -row 1 -sticky nse -padx 2 -pady 2
         grid .searchbox -column 0 -row 1 -sticky nse -padx 10 -pady 1
         grid .mylist -column 0 -row 0 -sticky nsew -columnspan 2
-        
-#--------Configure Grid---------------
         grid columnconfigure . 0 -weight 1
         grid rowconfigure . 0 -weight 1
 
